@@ -10,11 +10,12 @@ import { test, expect } from '@playwright/test';
 test.describe('Taxonomy module functionality', () => {
   test.describe.configure({ mode: 'serial' });
 
-  const vocabName = `Test Vocab ${Date.now()}`;
+  const suffix = Math.random().toString(36).slice(2, 7);
+  const vocabName = `vocab${suffix}`;
   const vocabDescription = 'Initial description for test vocabulary';
   const updatedDescription = 'Updated description for test vocabulary';
-  const termName = `Test Term ${Date.now()}`;
-  const secondVocabName = `Second Vocab ${Date.now()}`;
+  const termName = `term ${suffix}`;
+  const secondVocabName = `vocab2${suffix}`;
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/admin/structure/taxonomy');
@@ -25,8 +26,9 @@ test.describe('Taxonomy module functionality', () => {
     await expect(page).toHaveURL(/\/admin\/structure\/taxonomy\/add/);
 
     await page.locator('#edit-name').fill(vocabName);
-    await page.getByLabel('Description').fill(vocabDescription);
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.locator('#edit-vid').fill(vocabName);
+    await page.locator('#edit-description').fill(vocabDescription);
+    await page.locator('#edit-submit').click({ force: true });
 
     await expect(page.getByText('Created new vocabulary')).toBeVisible();
   });
@@ -57,7 +59,9 @@ test.describe('Taxonomy module functionality', () => {
     await page.getByRole('link', { name: 'Add vocabulary' }).click();
 
     await page.locator('#edit-name').fill(secondVocabName);
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.locator('#edit-vid').fill(secondVocabName);
+    await page.locator('#edit-description').fill(vocabDescription);
+    await page.locator('#edit-submit').click({ force: true });
 
     await expect(page.getByText('Created new vocabulary')).toBeVisible();
   });
