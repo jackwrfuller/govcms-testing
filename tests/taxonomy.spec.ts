@@ -8,6 +8,8 @@ import { test, expect } from '@playwright/test';
  *   - User is on /admin/structure/taxonomy
  */
 test.describe('Taxonomy module functionality', () => {
+  test.describe.configure({ mode: 'serial' });
+
   const vocabName = `Test Vocab ${Date.now()}`;
   const vocabDescription = 'Initial description for test vocabulary';
   const updatedDescription = 'Updated description for test vocabulary';
@@ -22,7 +24,7 @@ test.describe('Taxonomy module functionality', () => {
     await page.getByRole('link', { name: 'Add vocabulary' }).click();
     await expect(page).toHaveURL(/\/admin\/structure\/taxonomy\/add/);
 
-    await page.getByLabel('Name').fill(vocabName);
+    await page.locator('#edit-name').fill(vocabName);
     await page.getByLabel('Description').fill(vocabDescription);
     await page.getByRole('button', { name: 'Save' }).click();
 
@@ -30,9 +32,9 @@ test.describe('Taxonomy module functionality', () => {
   });
 
   test('edit vocabulary description', async ({ page }) => {
-    // Find and click the edit link for our vocabulary.
     const vocabRow = page.locator('tr', { has: page.getByText(vocabName) });
-    await vocabRow.getByRole('link', { name: 'Edit vocabulary' }).click();
+    await vocabRow.getByRole('button', { name: 'List additional actions' }).click();
+    await vocabRow.getByRole('link', { name: `Edit ${vocabName}` }).click();
 
     await page.getByLabel('Description').fill(updatedDescription);
     await page.getByRole('button', { name: 'Save' }).click();
@@ -41,13 +43,12 @@ test.describe('Taxonomy module functionality', () => {
   });
 
   test('add a term to the vocabulary', async ({ page }) => {
-    // Navigate to the vocabulary's term listing and add a term.
     const vocabRow = page.locator('tr', { has: page.getByText(vocabName) });
-    await vocabRow.getByRole('link', { name: 'List terms' }).click();
-    await page.getByRole('link', { name: 'Add term' }).click();
+    await vocabRow.getByRole('button', { name: 'List additional actions' }).click();
+    await page.getByRole('link', { name: 'Add terms' }).click();
 
-    await page.getByLabel('Name').fill(termName);
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.locator('#edit-name-0-value').fill(termName);
+    await page.locator('#edit-submit').click();
 
     await expect(page.getByText('Created new term')).toBeVisible();
   });
@@ -55,24 +56,20 @@ test.describe('Taxonomy module functionality', () => {
   test('create additional vocabularies', async ({ page }) => {
     await page.getByRole('link', { name: 'Add vocabulary' }).click();
 
-    await page.getByLabel('Name').fill(secondVocabName);
+    await page.locator('#edit-name').fill(secondVocabName);
     await page.getByRole('button', { name: 'Save' }).click();
 
     await expect(page.getByText('Created new vocabulary')).toBeVisible();
   });
 
   test('reorder vocabularies', async ({ page }) => {
-    // Drupal's taxonomy overview page has a weight-based reorder form.
-    // Interact with the weight select to reorder, then save.
-    const vocabRow = page.locator('tr', { has: page.getByText(vocabName) });
-    const weightSelect = vocabRow.locator('select[name*="weight"]');
-
-    // If the weight select is hidden behind a "Show row weights" link, reveal it.
-    const showWeightsLink = page.getByRole('link', { name: 'Show row weights' });
-    if (await showWeightsLink.isVisible()) {
-      await showWeightsLink.click();
+    const showWeightsButton = page.getByRole('button', { name: 'Show row weights' });
+    if (await showWeightsButton.isVisible()) {
+      await showWeightsButton.click();
     }
 
+    const vocabRow = page.locator('tr', { has: page.getByText(vocabName) });
+    const weightSelect = vocabRow.locator('select[name*="weight"]');
     await weightSelect.selectOption({ index: 0 });
     await page.getByRole('button', { name: 'Save' }).click();
 
@@ -81,37 +78,15 @@ test.describe('Taxonomy module functionality', () => {
     ).toBeVisible();
   });
 
-  test('delete a vocabulary', async ({ page }) => {
-    // Delete the second vocabulary.
-    const vocabRow = page.locator('tr', { has: page.getByText(secondVocabName) });
-    await vocabRow.getByRole('link', { name: 'Edit vocabulary' }).click();
-
-    await page.getByRole('link', { name: 'Delete' }).click();
-
-    // Confirm deletion on the confirmation page.
-    await page.getByRole('button', { name: 'Delete' }).click();
-
-    await expect(page.getByText('Deleted vocabulary')).toBeVisible();
-  });
-
-  test.afterAll(async ({ browser }) => {
-    // Clean up: delete the first vocabulary too.
-    const context = await browser.newContext({
-      storageState: 'playwright/.auth/user.json',
-    });
-    const page = await context.newPage();
-
-    await page.goto('/admin/structure/taxonomy');
-    const vocabRow = page.locator('tr', { has: page.getByText(vocabName) });
-
-    // Only clean up if the vocab still exists.
-    if (await vocabRow.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await vocabRow.getByRole('link', { name: 'Edit vocabulary' }).click();
-      await page.getByRole('link', { name: 'Delete' }).click();
+  test('delete vocabularies', async ({ page }) => {
+    for (const name of [secondVocabName, vocabName]) {
+      const vocabRow = page.locator('tr', { has: page.getByText(name) });
+      await vocabRow.getByRole('button', { name: 'List additional actions' }).click();
+      await vocabRow.getByRole('link', { name: `Delete ${name}` }).click();
       await page.getByRole('button', { name: 'Delete' }).click();
       await expect(page.getByText('Deleted vocabulary')).toBeVisible();
-    }
 
-    await context.close();
+      await page.goto('/admin/structure/taxonomy');
+    }
   });
 });
